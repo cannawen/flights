@@ -1,2 +1,5 @@
 .lein-repl-history
 target
+.idea
+.nrepl-port
+flights.iml
