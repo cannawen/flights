@@ -7,112 +7,108 @@
       (clojure.string/split #",")
       (->> (map #(Float/parseFloat %)))))
 
+(def rules
+  '[
+
+    [(airport-within-bounds ?lon-min ?lat-min ?lon-max ?lat-max ?airport)
+     [?airport :airport/latitude ?latitude]
+     [?airport :airport/longitude ?longitude]
+     [(< ?lat-min ?latitude)]
+     [(< ?latitude ?lat-max)]
+     [(< ?lon-min ?longitude)]
+     [(< ?longitude ?lat-max)]]
+
+    [(airport-one-away-from ?source-code ?airport)
+     [?route-1 :route/source-code ?source-code]
+     [?route-1 :route/destination-id ?airport-id]
+     [?airport :airport/id ?airport-id]]
+
+    [(airport-two-away-from ?source-code ?airport)
+     [?route-1 :route/source-code ?source-code]
+     [?route-1 :route/destination-id ?stop-1-airport-id]
+     [?route-2 :route/source-id ?stop-1-airport-id]
+     [?route-2 :route/destination-id ?airport-id]
+     [?airport :airport/id ?airport-id]]
+    
+    [(airport-not-in-schengen ?airport)
+     [?country :country/schengen? false]
+     [?country :country/name ?country-name]
+     [?airport :airport/country ?country-name]]
+    
+    ])
+
 (defn airports-two-away []
   (db/query
-    '[:find ?city
+    '[:find ?city ?country
+      :in $ %
       :where 
-      [?route-1 :route/source-code "TPE"]
-      [?route-1 :route/destination-id ?stop-1-airport-id]
-      [?route-2 :route/source-id ?stop-1-airport-id]
-      [?route-2 :route/destination-id ?airport-id]
-      [?airport :airport/id ?airport-id]
-      [?airport :airport/city ?city]]))
+      (airport-two-away-from "TPE" ?airport)
+      [?airport :airport/city ?city]
+      [?airport :airport/country ?country]]
+    rules))
 
 (defn airports-within-bounds []
   (let [bounds "7.1,32.4,43.5,48.46"]
     (db/query
       '[:find ?city ?country
-        :in $ [?lon-min ?lat-min ?lon-max ?lat-max]
+        :in $ % [?lon-min ?lat-min ?lon-max ?lat-max] 
         :where 
+        (airport-within-bounds ?lon-min ?lat-min ?lon-max ?lat-max ?airport)
         [?airport :airport/city ?city]
-        [?airport :airport/country ?country]
-        [?airport :airport/latitude ?latitude]
-        [?airport :airport/longitude ?longitude]
-        [(< ?lat-min ?latitude)]
-        [(< ?latitude ?lat-max)]
-        [(< ?lon-min ?longitude)]
-        [(< ?longitude ?lat-max)]]
+        [?airport :airport/country ?country]]
+      rules
       (parse-bounds bounds))))
 
 (defn airports-one-away-within-bounds []
   (let [bounds "7.1,32.4,43.5,48.46"]
     (db/query
       '[:find ?city ?country
-        :in $ [?lon-min ?lat-min ?lon-max ?lat-max]
+        :in $ % [?lon-min ?lat-min ?lon-max ?lat-max]
         :where 
-        [?route :route/source-code "TPE"]
-        [?route :route/destination-id ?airport-id]
-        [?airport :airport/id ?airport-id]
-        [?airport :airport/latitude ?latitude]
-        [?airport :airport/longitude ?longitude]
-        [(< ?lat-min ?latitude)]
-        [(< ?latitude ?lat-max)]
-        [(< ?lon-min ?longitude)]
-        [(< ?longitude ?lat-max)]
+        (airport-within-bounds ?lon-min ?lat-min ?lon-max ?lat-max ?airport)
+        (airport-one-away-from "TPE")
         [?airport :airport/city ?city]
         [?airport :airport/country ?country]]
+      rules
       (parse-bounds bounds))))
 
 (defn airports-two-away-within-bounds []
   (let [bounds "7.1,32.4,43.5,48.46"]
     (db/query 
       '[:find ?city ?country
-        :in $ [?lon-min ?lat-min ?lon-max ?lat-max]
+        :in $ % [?lon-min ?lat-min ?lon-max ?lat-max]
         :where
-        [?route-1 :route/source-code "TPE"]
-        [?route-1 :route/destination-id ?stop-1-airport-id]
-        [?route-2 :route/source-id ?stop-1-airport-id]
-        [?route-2 :route/destination-id ?airport-id]
-        [?airport :airport/id ?airport-id]
-        [?airport :airport/latitude ?latitude]
-        [?airport :airport/longitude ?longitude]
-        [(< ?lat-min ?latitude)]
-        [(< ?latitude ?lat-max)]
-        [(< ?lon-min ?longitude)]
-        [(< ?longitude ?lat-max)]
-        [?airport :airport/country ?country]
-        [?airport :airport/city ?city]]
+        (airport-within-bounds ?lon-min ?lat-min ?lon-max ?lat-max ?airport)
+        (airport-two-away-from "TPE" ?airport)
+        [?airport :airport/city ?city]
+        [?airport :airport/country ?country]]
+      rules
       (parse-bounds bounds))))
-
 
 (defn airports-two-away-within-bounds-but-not-schengen []
   (let [bounds "7.1,32.4,43.5,48.46"]
     (db/query
-      '[:find ?city ?country-name
-        :in $ [?lon-min ?lat-min ?lon-max ?lat-max]
+      '[:find ?city ?country
+        :in $ % [?lon-min ?lat-min ?lon-max ?lat-max]
         :where
-        [?country :country/schengen? false]
-        [?country :country/name ?country-name]
-        [?airport :airport/country ?country-name]
-        [?airport :airport/latitude ?latitude]
-        [?airport :airport/longitude ?longitude]
-        [(< ?lat-min ?latitude)]
-        [(< ?latitude ?lat-max)]
-        [(< ?lon-min ?longitude)]
-        [(< ?longitude ?lat-max)]
-        [?route-1 :route/source-code "TPE"]
-        [?route-1 :route/destination-id ?stop-1-airport-id]
-        [?route-2 :route/source-id ?stop-1-airport-id]
-        [?route-2 :route/destination-id ?airport-id]
-        [?airport :airport/id ?airport-id]
-        [?airport :airport/city ?city]]
+        (airport-not-in-schengen ?airport)
+        (airport-within-bounds ?lon-min ?lat-min ?lon-max ?lat-max ?airport)
+        (airport-two-away-from "TPE" ?airport)
+        [?airport :airport/city ?city]
+        [?airport :airport/country ?country]]
+      rules
       (parse-bounds bounds))))
 
 (defn airports-within-bounds-but-not-schengen []
   (let [bounds "7.1,32.4,43.5,48.46"]
     (db/query
-      '[:find ?city ?country-name
-        :in $ [?lon-min ?lat-min ?lon-max ?lat-max]
+      '[:find ?city ?country
+        :in $ % [?lon-min ?lat-min ?lon-max ?lat-max]
         :where
-        [?country :country/schengen? false]
-        [?country :country/name ?country-name]
-        [?airport :airport/country ?country-name]
-        [?airport :airport/city ?city]
-        [?airport :airport/latitude ?latitude]
-        [?airport :airport/longitude ?longitude]
-        [(< ?lat-min ?latitude)]
-        [(< ?latitude ?lat-max)]
-        [(< ?lon-min ?longitude)]
-        [(< ?longitude ?lat-max)]]
+        (airport-not-in-schengen ?airport)
+        (airport-within-bounds ?lon-min ?lat-min ?lon-max ?lat-max ?airport)
+        [?airport :airport/country ?country]
+        [?airport :airport/city ?city]]
+      rules
       (parse-bounds bounds))))
 
