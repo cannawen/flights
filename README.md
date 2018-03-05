@@ -5,7 +5,6 @@ App that queries airport and route information
 ## To run
 
 `lein repl`
-`(import!)`
 `(run)`
 
 To reload after changes
